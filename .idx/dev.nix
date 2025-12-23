@@ -7,6 +7,11 @@
   packages = [
     pkgs.go
     pkgs.air
+    pkgs.clang
+    pkgs.nodejs
+    pkgs.gcc
+    pkgs.httpie
+    pkgs.sqlite
   ];
   # Sets environment variables in the workspace
   env = {};
