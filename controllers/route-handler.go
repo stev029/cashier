@@ -28,4 +28,21 @@ func Controller(routes *gin.Engine, db *gorm.DB) {
 		authRoute.POST("/login", authController.Login)
 		authRoute.POST("/logout", middlewares.AuthMiddleware(), authController.Logout)
 	}
+
+	// User Routes
+	userRoute := routes.Group("/users")
+	{
+		userController := NewUserController(db)
+		userRoute.GET("/me", middlewares.AuthMiddleware(), userController.Me)
+		userRoute.PUT("/:id/update", middlewares.AuthMiddleware(), middlewares.GroupPermission("superuser"), userController.UpdateUser)
+		userRoute.GET("/:id", userController.GetUserByID)
+	}
+
+	// Transaction Routes
+	transactionRoute := routes.Group("/transactions")
+	{
+		transactionController := NewTransactionController(db)
+		transactionRoute.POST("/", middlewares.AuthMiddleware(), middlewares.GroupPermission("staff"), transactionController.CreateTransaction)
+		transactionRoute.POST("/webhook", transactionController.WebhookTransaction)
+	}
 }

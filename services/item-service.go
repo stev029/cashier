@@ -11,15 +11,7 @@ import (
 	"gorm.io/gorm"
 )
 
-type ItemService struct {
-	db *gorm.DB
-}
-
-func NewItemService(db *gorm.DB) *ItemService {
-	return &ItemService{db: db}
-}
-
-func (s *ItemService) GetItems(c *gin.Context) (*[]model.Item, error) {
+func (s *ServiceImpl) GetItems(c *gin.Context) (*[]model.Item, error) {
 	var items []model.Item
 
 	if err := s.db.Find(&items).Error; err != nil {
@@ -29,7 +21,7 @@ func (s *ItemService) GetItems(c *gin.Context) (*[]model.Item, error) {
 	return &items, nil
 }
 
-func (s *ItemService) GetItemByID(c *gin.Context) (*model.Item, error) {
+func (s *ServiceImpl) GetItemByID(c *gin.Context) (*model.Item, error) {
 	var item model.Item
 
 	query := s.db.First(&item, c.Param("id"))
@@ -44,7 +36,7 @@ func (s *ItemService) GetItemByID(c *gin.Context) (*model.Item, error) {
 	return &item, nil
 }
 
-func (s *ItemService) CreateItem(c *gin.Context, req models.ItemRequest) (*model.Item, error) {
+func (s *ServiceImpl) CreateItem(c *gin.Context, req models.ItemRequest) (*model.Item, error) {
 	var item model.Item
 
 	if err := copier.Copy(&item, &req); err != nil {
@@ -58,7 +50,7 @@ func (s *ItemService) CreateItem(c *gin.Context, req models.ItemRequest) (*model
 	return &item, nil
 }
 
-func (s *ItemService) UpdateItem(c *gin.Context, req models.ItemRequest) (*model.Item, error) {
+func (s *ServiceImpl) UpdateItem(c *gin.Context, req models.ItemRequest) (*model.Item, error) {
 	var item model.Item
 
 	if err := s.db.First(&item, c.Param("id")).Error; err != nil {
@@ -79,7 +71,7 @@ func (s *ItemService) UpdateItem(c *gin.Context, req models.ItemRequest) (*model
 	return &item, nil
 }
 
-func (s *ItemService) DeleteItem(c *gin.Context) {
+func (s *ServiceImpl) DeleteItem(c *gin.Context) {
 	var item model.Item
 
 	go func() {

@@ -6,6 +6,6 @@ type ServiceImpl struct {
 	db *gorm.DB
 }
 
-func NewServiceImpl(db *gorm.DB) *ServiceImpl {
+func NewService(db *gorm.DB) *ServiceImpl {
 	return &ServiceImpl{db: db}
 }

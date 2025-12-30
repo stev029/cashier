@@ -1,8 +1,6 @@
 package services
 
 import (
-	"errors"
-	"log"
 	"net/http"
 	"time"
 
@@ -11,6 +9,7 @@ import (
 	"github.com/stev029/cashier/etc/database"
 	"github.com/stev029/cashier/etc/database/model"
 	"github.com/stev029/cashier/etc/utils"
+	httperr "github.com/stev029/cashier/http-errors"
 	"github.com/stev029/cashier/models"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -35,7 +34,6 @@ func (s *ServiceImpl) Login(c *gin.Context, req models.LoginRequest) (string, er
 		return "", err
 	}
 
-	log.Println(user.Role)
 	// 3. Jika OK, buat token
 	token, err := utils.GenerateToken(user.ID, string(user.Role))
 	if err != nil {
@@ -50,8 +48,7 @@ func (s *ServiceImpl) Register(c *gin.Context, req models.RegisterRequest) (stri
 	var user model.User // Model User Anda
 
 	if query := s.db.Where("email = ?", req.Email).First(&user); query.RowsAffected > 0 && query.Error == nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "email sudah digunakan"})
-		return "", errors.New("email sudah digunakan")
+		return "", httperr.NewHttpExceptionJSON(http.StatusBadRequest, gin.H{"error": "email already exists"})
 	}
 
 	if err := copier.Copy(&user, &req); err != nil {
@@ -77,7 +74,7 @@ func (s *ServiceImpl) LogoutService(ctx *gin.Context, tokenString string) error 
 	// 1. Verifikasi token terlebih dahulu
 	token, claims, err := utils.VerifyToken(tokenString)
 	if err != nil || !token.Valid {
-		return errors.New("token sudah tidak valid")
+		return httperr.NewHttpExceptionJSON(http.StatusUnauthorized, gin.H{"error": "Invalid token"})
 	}
 
 	// 2. Hitung sisa waktu expired (TTL)

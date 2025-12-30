@@ -12,6 +12,14 @@ import (
 )
 
 var DB *gorm.DB
+var dbModel = []any{
+	model.Category{},
+	model.Item{},
+	model.User{},
+	model.Group{},
+	model.Permission{},
+	model.Transaction{},
+}
 
 func DBConnect() *gorm.DB {
 	if DB != nil {
@@ -46,16 +54,11 @@ func InitModel() error {
 		return gorm.ErrInvalidDB
 	}
 
-	err := DB.AutoMigrate(
-		&model.Item{},
-		&model.Category{},
-		&model.User{},
-		&model.Group{},
-		&model.Permission{},
-	)
-
-	if err != nil {
-		return err
+	for _, model := range dbModel {
+		err := DB.AutoMigrate(&model)
+		if err != nil {
+			return err
+		}
 	}
 
 	return nil

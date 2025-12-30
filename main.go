@@ -10,6 +10,8 @@ import (
 	"github.com/stev029/cashier/controllers"
 	"github.com/stev029/cashier/etc/database"
 	_ "github.com/stev029/cashier/etc/database/autoload"
+	"github.com/stev029/cashier/etc/utils"
+	"github.com/stev029/cashier/middlewares"
 	"gorm.io/gorm"
 )
 
@@ -17,6 +19,7 @@ var db *gorm.DB
 
 func init() {
 	db = database.DB
+	utils.InitializeMidtrans()
 	err := database.InitModel()
 	if err != nil {
 		if err == gorm.ErrInvalidDB {
@@ -33,6 +36,7 @@ func main() {
 
 	router := gin.Default()
 	router.Use(gin.Logger())
+	router.Use(middlewares.CustomRecovery())
 
 	log.Print("starting server...")
 	router.GET("/ping", handler)
@@ -46,7 +50,7 @@ func main() {
 	}
 
 	// Start HTTP server.
-	log.Printf("listening on port %s", port)
+	log.Printf("listening app http://localhost:%s", port)
 	if err := http.ListenAndServe(":"+port, router); err != nil {
 		log.Fatal(err)
 	}

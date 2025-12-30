@@ -1,6 +1,8 @@
 package model
 
 import (
+	"log"
+
 	"golang.org/x/crypto/bcrypt"
 	"gorm.io/gorm"
 )
@@ -28,7 +30,7 @@ type Group struct {
 type User struct {
 	gorm.Model
 	Name     string   `gorm:"not null"`
-	Email    string   `gorm:"unique;not null"`
+	Email    string   `gorm:"unique;not null;<-:create"`
 	Password string   `gorm:"not null"`
 	Role     RoleType `gorm:"type:varchar(20);default:'user'"`
 	Groups   []Group  `gorm:"many2many:user_groups;"`
@@ -44,4 +46,27 @@ func (u *User) BeforeCreate(tx *gorm.DB) (err error) {
 	u.Password = string(bytes)
 
 	return
+}
+
+func (u *User) BeforeUpdate(tx *gorm.DB) error {
+	var oldUser User
+	if err := tx.First(&oldUser, u.ID).Error; err != nil {
+		log.Println("Error: ", err)
+		return err
+	}
+
+	err := bcrypt.CompareHashAndPassword([]byte(oldUser.Password), []byte(u.Password))
+	if err != nil {
+		hashedPassword, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
+		if err != nil {
+			return err
+		}
+		u.Password = string(hashedPassword)
+
+		return nil
+	}
+
+	u.Password = ""
+
+	return nil
 }
