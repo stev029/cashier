@@ -1,12 +1,16 @@
 package utils
 
 import (
-	"bytes"
 	"context"
-	"encoding/json"
-	"io"
+	"crypto/md5"
+	"encoding/hex"
+	"errors"
+	"log"
 	"net/http"
-	"net/url"
+	"os"
+	"strconv"
+
+	"github.com/idoyudha/duitku-go/common"
 )
 
 type PaymentMethod string
@@ -41,78 +45,100 @@ type DuitkuRequestCharge struct {
 	Signature       string        `json:"signature"`
 }
 
-func SendAPIRequest(
-	ctx context.Context,
-	req any,
-	res any,
-	method string,
-	url string,
-	headerParams map[string]string,
-) (*http.Response, error) {
-	r, err := setRequest(ctx, method, url, req, headerParams)
-	if err != nil {
-		return nil, err
-	}
-
-	httpResp, err := http.DefaultClient.Do(r)
-	if err != nil {
-		return httpResp, err
-	}
-
-	body, err := io.ReadAll(httpResp.Body)
-	httpResp.Body.Close()
-	httpResp.Body = io.NopCloser(bytes.NewBuffer(body))
-	if err != nil {
-		return httpResp, err
-	}
-
-	if err = json.Unmarshal(body, &res); err != nil {
-		return httpResp, err
-	}
-
-	return httpResp, nil
+type APIClient struct {
+	*common.ServiceClient
+	// API Services
+	PaymentService *PaymentService
 }
 
-func setRequest(
-	ctx context.Context,
-	method string,
-	urlInput string,
-	reqBody any,
-	headerParams map[string]string,
-) (req *http.Request, err error) {
-	var body *bytes.Buffer
+type PaymentService struct {
+	client *common.ServiceClient
+}
 
-	if reqBody != nil {
-		body = &bytes.Buffer{}
-		err = json.NewEncoder(body).Encode(reqBody)
-		if err != nil {
-			return nil, err
-		}
+func NewClient(cfg *common.Config) *APIClient {
+	c := &APIClient{
+		ServiceClient: &common.ServiceClient{
+			Cfg: cfg,
+		},
 	}
 
-	parsedUrl, err := url.Parse(urlInput)
+	c.PaymentService = &PaymentService{
+		client: c.ServiceClient,
+	}
+
+	return c
+}
+
+var DuitkuClient *APIClient
+var serverKey string
+
+func init() {
+	if DuitkuClient == nil {
+		log.Printf("Initializing Duitku...")
+		InitializeMidtrans()
+	}
+}
+
+func InitializeDuitku() {
+	if DuitkuClient != nil {
+		log.Println("Midtrans already initialized")
+		return
+	}
+
+	DuitkuClient = NewClient(&common.Config{
+		Environment:  common.SandboxEnv,
+		APIKey:       os.Getenv("DUITKU_API_KEY"),
+		MerchantCode: os.Getenv("DUITKU_MERCHANT_CODE"),
+	})
+}
+
+func (s *PaymentService) setBodyRequest(req *DuitkuRequestCharge) error {
+	if s.client.Cfg.MerchantCode == "" {
+		return errors.New("merchant code is empty")
+	}
+
+	if os.Getenv("DUITKU_CALLBACK_URL") == "" {
+		return errors.New("DUITKU_CALLBACK_URL is empty")
+	}
+
+	if os.Getenv("DUITKU_RETURN_URL") == "" {
+		return errors.New("DUITKU_RETURN_URL is empty")
+	}
+	req.MerchantCode = s.client.Cfg.MerchantCode
+	req.Signature = s.generatePaymentSignature(req.MerchantCode + req.MerchantOrderId + strconv.Itoa(req.PaymentAmount) + s.client.Cfg.APIKey)
+	req.CallbackUrl = os.Getenv("DUITKU_CALLBACK_URL")
+	req.ReturnUrl = os.Getenv("DUITKU_RETURN_URL")
+	return nil
+}
+
+func (s *PaymentService) Charge(ctx context.Context, req DuitkuRequestCharge) (DuitkuResponseCharge, *http.Response, error) {
+	res := &DuitkuResponseCharge{}
+	path := "/merchant/v2/inquiry"
+
+	baseUrl := common.SandboxV2BaseURL
+	if s.client.Cfg.Environment == common.ProductionEnv {
+		baseUrl = common.ProductionV2BaseURL
+	}
+
+	err := s.setBodyRequest(&req)
 	if err != nil {
-		return nil, err
+		return *res, nil, err
 	}
 
-	if body != nil {
-		req, err = http.NewRequestWithContext(ctx, method, parsedUrl.String(), body)
-	} else {
-		req, err = http.NewRequestWithContext(ctx, method, parsedUrl.String(), nil)
-	}
-	if err != nil {
-		return nil, err
-	}
+	httpRes, err := common.SendAPIRequest(
+		ctx,
+		s.client,
+		req,
+		res,
+		http.MethodPost,
+		baseUrl+path,
+		nil,
+	)
 
-	if len(headerParams) > 0 {
-		headers := http.Header{}
-		for h, v := range headerParams {
-			headers.Set(h, v)
-		}
-		req.Header = headers
-	}
+	return *res, httpRes, err
+}
 
-	req.Header.Set("Content-Type", "application/json")
-
-	return req, nil
+func (s *PaymentService) generatePaymentSignature(parameter string) string {
+	md5Hash := md5.Sum([]byte(parameter))
+	return hex.EncodeToString(md5Hash[:])
 }

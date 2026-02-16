@@ -6,7 +6,7 @@ import (
 )
 
 type Transaction struct {
-	ID          uuid.UUID      `gorm:"type:uuid;default:uuid_generate_v4();primary_key"`
+	ID          uuid.UUID      `gorm:"type:uuid;default:gen_random_uuid();primary_key"`
 	UserID      uint           `json:"user_id"`
 	Amount      int            `json:"amount"`
 	OrderID     string         `json:"order_id"`

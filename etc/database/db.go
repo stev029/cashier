@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/stev029/cashier/etc/database/model"
-	"gorm.io/driver/sqlite"
+	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
@@ -27,7 +27,7 @@ func DBConnect() *gorm.DB {
 	}
 
 	dsn := os.Getenv("DATABASE_URL")
-	db, err := gorm.Open(sqlite.Open(dsn), &gorm.Config{
+	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),
 	})
 

@@ -10,6 +10,7 @@ import (
 	"github.com/stev029/cashier/etc/utils"
 	"github.com/stev029/cashier/models"
 
+	"github.com/midtrans/midtrans-go"
 	"github.com/midtrans/midtrans-go/coreapi"
 )
 
@@ -17,18 +18,28 @@ type TransactionService interface {
 	CreateTransaction(transaction model.Transaction) (*coreapi.ChargeResponse, error)
 }
 
-func (s *ServiceImpl) CreateTransaction(ctx *gin.Context, transaction models.TransactionRequest) (*utils.DuitkuResponseCharge, error) {
+func (s *ServiceImpl) CreateTransaction(ctx *gin.Context, transaction models.TransactionRequest) (*coreapi.ChargeResponse, error) {
 	order_id := fmt.Sprintf("order-%d", time.Now().Unix())
-	chargeReq := utils.DuitkuRequestCharge{
-		MerchantOrderId: order_id,
-		ProductDetails:  fmt.Sprintf("Payment-Invoice-%s", order_id),
-		Email:           "abyy1144@gmail.com",
-		PaymentMethod:   utils.GUDANGVQR,
-		CustomerVaName:  transaction.CustomerName,
-		PaymentAmount:   int(transaction.Price),
+	chargeReq := &coreapi.ChargeReq{
+		PaymentType: coreapi.PaymentTypeQris,
+		TransactionDetails: midtrans.TransactionDetails{
+			OrderID:  order_id,
+			GrossAmt: int64(transaction.Price),
+		},
+		Items: &[]midtrans.ItemDetails{
+			{
+				ID:    "item-1",
+				Name:  "Item 1",
+				Price: int64(transaction.Price),
+				Qty:   1,
+			},
+		},
+		Qris: &coreapi.QrisDetails{
+			Acquirer: "airpay shopee",
+		},
 	}
 
-	resp, _, err := utils.DuitkuClient.PaymentService.Charge(ctx, chargeReq)
+	resp, err := utils.MidtransClient.ChargeTransaction(chargeReq)
 	if err != nil {
 		return nil, err
 	}
@@ -41,12 +52,12 @@ func (s *ServiceImpl) CreateTransaction(ctx *gin.Context, transaction models.Tra
 		OrderID:     order_id,
 		Status:      resp.StatusCode,
 		PaymentType: transaction.PaymentType,
-		PaymentCode: resp.QrString, // For QRIS, the payment code is in the URL
+		PaymentCode: resp.QRString, // For QRIS, the payment code is in the URL
 	}
 
 	if err := db.Create(&newTransaction).Error; err != nil {
 		return nil, err
 	}
 
-	return &resp, nil
+	return resp, nil
 }
